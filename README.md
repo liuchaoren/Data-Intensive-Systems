@@ -8,7 +8,7 @@ Installation
 3. Download the Vagrantfile from this repository and place it in the folder you want your VM to reside.
 4. Open up a command prompt, go to that folder, and type "vagrant up". 
 5. Once that is done, type "vagrant ssh" to get into the virtual machine.
-6. Check out the project repository: "git clone https://github.com/bwalenz/cs516-team.git"
+6. Check out the project repository into your virtual machine: "git clone https://github.com/bwalenz/cs516-team.git"
 
 Notes
 -----
