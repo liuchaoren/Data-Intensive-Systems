@@ -20,8 +20,8 @@ person_a_vote, person_b_vote, vote_date, bill_number, year, chamber(h or s), sta
 s3 Data Files
 -------------
 1. [2012-curr-full-votes.csv](https://s3.amazonaws.com/cs516-fact-check/2012-curr-full-votes.csv) - 158 MB
-2. [full-mlb-player-stats.csv](https://s3.amazonaws.com/cs516-fact-check/full-mlb-player-stats.csv) - 1 GB
-3. [full_votes.csv](https://s3.amazonaws.com/cs516-fact-check/full_votes.csv) - 9 MB 
+2. [full-mlb-player-stats.csv](https://s3.amazonaws.com/cs516-fact-check/full-mlb-player-stats.csv) - 9 MB
+3. [full_votes.csv](https://s3.amazonaws.com/cs516-fact-check/full_votes.csv) - 1 GB
 
 Format of S3 Voting Data
 ------------------------
