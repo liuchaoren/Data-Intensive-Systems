@@ -1,0 +1,4 @@
+Baseball fact check result:
+The number of people over 40 home runs and 40 base steals: 893
+The number of people over 30 home runs and 30 base steals: 1190
+The number of people who has more home runs and base steals than aasedo01 in the round 1 of 1977: 900
