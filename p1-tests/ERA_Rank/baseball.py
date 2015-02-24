@@ -2,15 +2,16 @@
 
 '''
 The rank of a player in earned runs average
-Bug: different workers use their own global counter1. therefore, the rank may be the rank in one worker but the universal rank
 
 Chaoren Liu @ Feb. 21, 2015
 '''
-playerID="linceti01"
-
 from pyspark import SparkContext 
+sc = SparkContext("local[4]", "ERA-checker")
+
+# input 
+playerID="linceti01"
 DataFile="full-mlb-player-stats.csv"
-sc = SparkContext("local", "Stats")
+
 Data=sc.textFile(DataFile).cache()
 
 # filter out the rows with meaningful ERA data
@@ -24,28 +25,15 @@ def mapfuncValue(x):
     (playerID, PERA)=(xstructed[0],float(xstructed[16]))
     return (playerID, PERA)
 
-# count the numbers of the lines of a player
-def mapfuncCount(x):
-    xstructed=x.split(",")
-    playerID =xstructed[0]
-    return (playerID, 1)
+# 
 
+if __name__ == "__main__":
+    DataCleaned=Data.filter(filterfunc).map(mapfuncValue).reduceByKey(lambda x, y: x+y).sortBy(lambda x: x[1])
+    ERAtarget=DataCleaned.lookup(playerID)[0]
+    rank=DataCleaned.filter(lambda x: round(x[1], 3) < round(ERAtarget, 3)).count()
+    output=open("output", 'w')
+    output.write("The ERA of the player %s is %8.3f\n" % (playerID, ERAtarget))
+    output.write("The rank of the player %s in ERA is %d\n" % (playerID, rank))
+    output.close()
 
-def mapfuncAve((pid, (total, count))):
-    return (total/count, pid)
-    
-counter1=0
-def g((i,x)):
-    global counter1
-    counter1=counter1+1
-    for j in x:
-        if j == playerID:
-            print "The ERA of player " + playerID + " is %f" % i
-            print "The ERA rank is %d" % counter1
-
-DataFiltered=Data.filter(filterfunc)
-DataCleaned=DataFiltered.map(mapfuncValue).reduceByKey(lambda x, y: x+y)
-DataCounter=DataFiltered.map(mapfuncCount).reduceByKey(lambda x, y: x+y)
-DataCleaned=DataCleaned.join(DataCounter).map(mapfuncAve).groupByKey().sortByKey()
-DataCleaned.foreach(g)
 
