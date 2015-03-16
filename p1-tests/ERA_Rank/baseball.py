@@ -10,7 +10,7 @@ sc = SparkContext("local[4]", "ERA-checker")
 
 # input 
 playerID="linceti01"
-DataFile="full-mlb-player-stats.csv"
+DataFile="../../../full-mlb-player-stats.csv"
 
 Data=sc.textFile(DataFile).cache()
 
