@@ -6,9 +6,15 @@ import datetime
 
 #votes_file = 'full_votes.csv'
 
-votes_file = '2012-curr-full-votes.csv'
+#votes_file = '2012-curr-full-votes.csv'
+votes_file = 's3n://' + AWS_ACCESS_KEY_ID + ':' + AWS_SECRET_ACCESS_KEY + '@cs516-fact-check/2012-curr-full-votes.csv'
 
-master = "local[4]" 
+AWS_ACCESS_KEY_ID=''
+AWS_SECRET_ACCESS_KEY=''
+
+#master = "local[4]" 
+master = "spark://ec2-54-152-24-8.compute-1.amazonaws.com:7077"
+
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
     return votes_data
@@ -66,23 +72,17 @@ def run(context):
     the minimum voting percentage for each person. '''
     votes = raw_votes.map(keyByPerson)
     bills = votes.map(rekeyByBillId)
+    bills = bills.repartition(16)
+    bills = bills.sortByKey()
     keys = votes.keys().collect()
     results = []
-    for i in range(0, len(keys), 10):
+    for i in range(0, len(keys), 100):
         key_list = keys[i:i+10]
         #filter votes by key_list
         persons = votes.filter(lambda x: x[0] in key_list)
-    #    ps = persons.collect()
-    #    print("PERSONS1:", ps)
         persons = persons.map(rekeyByBillId)
-    #    print("PERSONS=========================")
-    #    print(persons.collect())
         joined = bills.join(persons)
-    #    print("JOINED==========================")
-    #    print(joined.collect())
         counted = joined.map(count_votes)
-    #    print("COUNTED========================")
-    #    print(counted.collect())
         counted = counted.reduceByKey(reduce_count)
         results.append(counted.collect())
     return results
