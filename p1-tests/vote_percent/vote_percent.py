@@ -3,23 +3,23 @@ from pyspark import SparkContext
 import StringIO
 import csv
 import datetime
+import config
 
 #votes_file = 'full_votes.csv'
 
 #votes_file = '2012-curr-full-votes.csv'
-votes_file = 's3n://' + AWS_ACCESS_KEY_ID + ':' + AWS_SECRET_ACCESS_KEY + '@cs516-fact-check/2012-curr-full-votes.csv'
+votes_file = 's3n://' + config.S3_AWS_ACCESS_KEY_ID + ':' + config.S3_AWS_SECRET_ACCESS_KEY + '@cs516-fact-check/2012-curr-full-votes.csv'
 
-AWS_ACCESS_KEY_ID=''
-AWS_SECRET_ACCESS_KEY=''
 
 #master = "local[4]" 
-master = "spark://ec2-54-152-24-8.compute-1.amazonaws.com:7077"
+#master = "spark://ec2-54-152-24-8.compute-1.amazonaws.com:7077"
+master = config.SPARK_MASTER
 
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
     return votes_data
 
-def parseVote(line):
+def keyByBillId(line):
     df = '%Y-%m-%d'    
     input = StringIO.StringIO(line)
     reader = csv.reader(input)
@@ -61,9 +61,19 @@ def count_votes((key, joined_tuple)):
     return (key, (agree, disagree))
 
 def reduce_count(left, right):
-    agree = left[0] + right[0]
-    dis = left[1] + right[1]
+    agree = left[0] + right[0] + 1
+    dis = left[1] + right[1] + 1
     return (agree, dis, float(agree) / (agree + dis))
+
+def run2(context):
+    raw_votes = load_votes(context)
+    bills = raw_votes.map(keyByBillId)
+    bills = bills.repartition(16)
+    bills = bills.sortByKey()
+    joined = bills.join(bills)
+    counted = joined.map(count_votes)
+    counted = counted.reduceByKey(reduce_count)
+    return counted.collect()
 
 def run(context):
     raw_votes = load_votes(context)
@@ -89,7 +99,7 @@ def run(context):
 
 if __name__ == "__main__":
     context = SparkContext(master, "Congress Correlation")
-    results = run(context)
+    results = run2(context)
     output = open('output.txt', 'w')
     for result in results:
         output.write("{0}\n".format(str(result)))

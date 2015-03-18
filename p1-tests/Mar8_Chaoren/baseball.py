@@ -7,13 +7,16 @@ provide the rank of average feature score in each possible year period, in (year
 Chaoren Liu @ Mar. 8, 2015
 '''
 from pyspark import SparkContext 
-sc = SparkContext("local[4]", "ERA-checker")
+
+import config
+master = config.SPARK_MASTER
+sc = SparkContext(master, "ERA-checker")
 
 features={"playerid":0, "first_name":1, "last_name":2, "weight":3, "height":4, "year":5, "round":6, "team_id":7, "league_id":8, "games_pitched":9, "games_pitched_started":10, "p_shutouts":11, "p_hits":12, "p_strikeouts":13, "p_walks":14, "p_saves":15, "p_earned_run_average":16, "b_at_bats":17, "b_runs":18, "b_hits":19, "b_doubles":20, "b_triples":21, "b_homeruns":22, "b_runs_batted_in":23, "b_stolen_bases":24, "b_strikeouts":25, "b_walks":26}
 
 # input 
 feature="b_at_bats"
-DataFile="/home/vagrant/DataIntense/Project/cs516-team/p1-tests/ERA_Rank/full-mlb-player-stats.csv"
+DataFile="s3n://" + config.S3_AWS_ACCESS_KEY_ID + ":" + config.S3_AWS_SECRET_ACCESS_KEY  + "@cs516-fact-check/full-mlb-player-stats.csv"
 yearsNumLower=3     # the number of years considered, lower limit 
 yearsNumUpper=4     # the number of years considered, upper limit 
 

@@ -1,12 +1,14 @@
 #!/home/vagrant/opt/spark/spark-1.2.1-bin-hadoop2.4/bin/pyspark
 
 from pyspark import SparkContext 
-sc = SparkContext("local[4]", "fact checking")
+import config
+
+sc = SparkContext(config.SPARK_MASTER, "fact checking")
 
 features={"playerid":0, "first_name":1, "last_name":2, "weight":3, "height":4, "year":5, "round":6, "team_id":7, "league_id":8, "games_pitched":9, "games_pitched_started":10, "p_shutouts":11, "p_hits":12, "p_strikeouts":13, "p_walks":14, "p_saves":15, "p_earned_run_average":16, "b_at_bats":17, "b_runs":18, "b_hits":19, "b_doubles":20, "b_triples":21, "b_homeruns":22, "b_runs_batted_in":23, "b_stolen_bases":24, "b_strikeouts":25, "b_walks":26}
 
 feature="b_at_bats"
-DataFile="/home/vagrant/project516/full-mlb-player-stats.csv"
+DataFile="s3n://" + config.S3_AWS_ACCESS_KEY_ID + ":" + config.S3_AWS_SECRET_ACCESS_KEY + "@cs516-fact-check/full-mlb-player-stats.csv"
 
 data=sc.textFile(DataFile).cache()
 def getFeature(x):
