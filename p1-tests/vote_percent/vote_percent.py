@@ -3,17 +3,10 @@ from pyspark import SparkContext
 import StringIO
 import csv
 import datetime
-import config
 
-#votes_file = 'full_votes.csv'
-
-#votes_file = '2012-curr-full-votes.csv'
-votes_file = 's3n://' + config.S3_AWS_ACCESS_KEY_ID + ':' + config.S3_AWS_SECRET_ACCESS_KEY + '@cs516-fact-check/2012-curr-full-votes.csv'
-
-
+votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]" 
-#master = "spark://ec2-54-152-24-8.compute-1.amazonaws.com:7077"
-master = config.SPARK_MASTER
+master = "spark://ec2-54-158-191-221.compute-1.amazonaws.com:7077"
 
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
