@@ -60,6 +60,7 @@ def reduce_count(left, right):
 
 def run2(context):
     raw_votes = load_votes(context)
+    print raw_votes
     bills = raw_votes.map(keyByBillId)
     bills = bills.repartition(16)
     bills = bills.sortByKey()
