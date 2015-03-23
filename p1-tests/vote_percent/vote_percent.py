@@ -3,10 +3,12 @@ from pyspark import SparkContext
 import StringIO
 import csv
 import datetime
+import permute.interval as interval
+import pandas
 
 votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]" 
-master = "spark://ec2-54-158-191-221.compute-1.amazonaws.com:7077"
+master = "spark://ec2-54-163-106-178.compute-1.amazonaws.com:7077"
 
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
@@ -19,7 +21,14 @@ def keyByBillId(line):
     tup = reader.next()
     if tup:
       tup[6] = datetime.datetime.strptime(tup[6], df).date()
-    return (tup[0], tup[1:])
+    reduced = []
+    #person id
+    reduced.append(tup[1])
+    #date
+    reduced.append(tup[6])
+    #vote (yay, nay, etc)
+    reduced.append(tup[2])
+    return (tup[0], reduced)
 
 def keyByPerson(line):
     df = '%Y-%m-%d'    
@@ -47,49 +56,46 @@ def count_votes((key, joined_tuple)):
     key = left_id + ":" + right_id
     agree = 0
     disagree = 0
-    if left[1] == right[1]:
+    if left[2] == right[2]:
         agree = 1
     else:
         disagree = 1
-    return (key, (agree, disagree))
+    return (key, (agree, disagree, left[1]))
+
+def map_by_interval(((key, (agree, disagree, vote_date)), (id, start, end))):
+    newKey = key + ":" + str(start) + ":" + str(end)
+    return (newKey, (agree, disagree))
+
+def filter_by_interval(((key, (agree, disagree, vote_date)), (id, start, end))):
+    if vote_date >= start and vote_date <= end:
+        return True
+    return False
 
 def reduce_count(left, right):
-    agree = left[0] + right[0] + 1
-    dis = left[1] + right[1] + 1
-    return (agree, dis, float(agree) / (agree + dis))
+    agree = left[0] + right[0]
+    dis = left[1] + right[1]
+    return (agree, dis)
+
+def filter_join((key, (left, right))):
+  if left[0] < right[0]:
+     return True
+  return False
 
 def run2(context):
     raw_votes = load_votes(context)
-    print raw_votes
+    intervals = interval.interval_set('1/1/2011', '1/1/2014', freq='D', max_delta=pandas.Timedelta(days=120))
     bills = raw_votes.map(keyByBillId)
-    bills = bills.repartition(16)
-    bills = bills.sortByKey()
-    joined = bills.join(bills)
+    joined = bills.join(bills, 16)
+    joined = joined.filter(filter_join)
     counted = joined.map(count_votes)
-    counted = counted.reduceByKey(reduce_count)
+    #now join in the intervals? 
+    #or glom things together? 
+    intervals_rdd = context.parallelize(intervals)
+    interval_cart = counted.cartesian(intervals_rdd)
+    interval_cart = interval_cart.filter(filter_by_interval)
+    interval_cart = interval_cart.map(map_by_interval)
+    counted = interval_cart.reduceByKey(reduce_count)
     return counted.collect()
-
-def run(context):
-    raw_votes = load_votes(context)
-    ''' Find all the people in this file (tuple[1])
-    Then iterate through a few 'batches' at a turn, finding
-    the minimum voting percentage for each person. '''
-    votes = raw_votes.map(keyByPerson)
-    bills = votes.map(rekeyByBillId)
-    bills = bills.repartition(16)
-    bills = bills.sortByKey()
-    keys = votes.keys().collect()
-    results = []
-    for i in range(0, len(keys), 100):
-        key_list = keys[i:i+10]
-        #filter votes by key_list
-        persons = votes.filter(lambda x: x[0] in key_list)
-        persons = persons.map(rekeyByBillId)
-        joined = bills.join(persons)
-        counted = joined.map(count_votes)
-        counted = counted.reduceByKey(reduce_count)
-        results.append(counted.collect())
-    return results
 
 if __name__ == "__main__":
     context = SparkContext(master, "Congress Correlation")

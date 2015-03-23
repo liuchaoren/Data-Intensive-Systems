@@ -33,7 +33,7 @@ def interval_set(start, end, freq='D', max_delta=None, use_pandas=False):
     del intervals['dummy_cross']
     intervals = intervals[(intervals.date_start < intervals.date_end)]
     if max_delta:
-        intervals = intervals[((intervals.date_end - intervals.date_start) <= max_delta)]
+      intervals = intervals[((intervals.date_end - intervals.date_start) == max_delta)]
     if not use_pandas:
       intervals = intervals.to_records()
       ints = []
