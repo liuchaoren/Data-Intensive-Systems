@@ -101,10 +101,13 @@ def filter_join((key, (left, right))):
      return True
   return False
 
-def filter_by_int((key, (agree, disagree, vote_date)), start=None, end=None):
+def filter_by_int(((key, (agree, disagree, vote_date)), (id, start, end))):
   if vote_date >= start and vote_date <= end:
     return True
   return False
+
+def key_by_interval_and_person(((key, (agree, disagree, vote_date)), (id, start, end))):
+  return (key + ":" + str(start) + ":" + str(end), (agree, disagree, vote_date))
 
 def run(context):
     """ Data is in the following format: (bill_id, person_id, vote, type, chamber, year, date, session, status, extra).
@@ -124,26 +127,22 @@ def run(context):
 
     pct_map = defaultdict(float)
     interval_map = dict()
-    """
-    Now we iterate through the intervals one by one. A better choice might
-    be to join a bunch of intervals at once (ie do the calculations in batches)
-    via a cartesian(intervals) call.
-    """
-    for (id, start, end) in intervals[0:100]:
-      print(id, '  ', str(start), '  ', str(end))
-      func = partial(filter_by_int, start=start, end=end)
-      temp = counted.filter(func)
-      
-      results = temp.reduceByKey(reduce_count)
-      results = results.filter(filter_count)
-      result_list = results.collect()
-      """ Store the lowest result in a dictionary. """
-      for result in result_list:
-        print(result)
-        (key, (agree, disagree, pct)) = result
-        if pct_map[key] > pct or pct_map[key] < .0001:
-          pct_map[key] = pct
-          interval_map[key] = result
+    ints = intervals[0:100]
+    ints_rdd = context.parallelize(ints)
+    votes_intervals = counted.cartesian(ints_rdd)
+    votes_intervals = votes_intervals.filter(filter_by_int)
+    votes_intervals = votes_intervals.map(key_by_interval_and_person)
+    results = votes_intervals.reduceByKey(reduce_count)
+    results = results.filter(filter_count)
+    result_list = results.collect()
+
+    """ Store the lowest result in a dictionary. """
+    for result in result_list:
+      print(result)
+      (key, (agree, disagree, pct)) = result
+      if pct_map[key] > pct or pct_map[key] < .0001:
+        pct_map[key] = pct
+        interval_map[key] = result
 
     return interval_map 
    
