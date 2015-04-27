@@ -10,7 +10,7 @@ import pandas
 
 votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]" 
-master = "spark://ec2-54-144-117-64.compute-1.amazonaws.com:7077"
+master = "spark://ec2-54-90-76-104.compute-1.amazonaws.com:7077"
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
     return votes_data
@@ -129,7 +129,7 @@ def run(context):
     be to join a bunch of intervals at once (ie do the calculations in batches)
     via a cartesian(intervals) call.
     """
-    for (id, start, end) in intervals[0:100]:
+    for (id, start, end) in intervals:
       print(id, '  ', str(start), '  ', str(end))
       func = partial(filter_by_int, start=start, end=end)
       temp = counted.filter(func)

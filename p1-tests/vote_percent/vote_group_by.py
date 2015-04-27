@@ -7,12 +7,11 @@ import datetime
 import permute.interval as interval
 import pandas
 import numpy as np
+import sqlite3
 
 votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]"
-master = "spark://ec2-54-90-76-104.compute-1.amazonaws.com:7077"
-
-
+master = "spark://ec2-23-22-131-140.compute-1.amazonaws.com:7077"
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
     return votes_data
@@ -88,33 +87,49 @@ def filter_join((key, (left, right))):
         return True
     return False
 
+def create_in_memory_database(counts_list):
+    conn = sqlite3.connect(":memory:")
+    c = conn.cursor()
+    c.execute('''CREATE TABLE votes (agree INT, disagree INT, date DATE)''')
+    c.executemany('INSERT INTO votes VALUES (?, ?, ?)', counts_list)
+    c.execute('CREATE INDEX date_index on votes(date)')
+    c.close()
+    return conn
 
-def filter_by_int(((key, (agree, disagree, vote_date)), (id, start, end))):
-    if vote_date >= start and vote_date <= end:
-        return True
-    return False
 
-def filter_by_int_big(((key,(agree, disagree)), (id, start, end))):
-    if key[1] >=start and key[2] <= end:
-        return True
-    else:
-        return False
-        
-def key_by_interval_and_person(((key, (agree, disagree, vote_date)), (id, start, end))):
-    return ((key, start, end), (agree, disagree))
+def calculate_percent_grouped_2(((key, counts), intervals)):
+  low = 1
+  for id, start, end in intervals:
+    total_a = 0
+    total_d = 0
+    pct = 1
+    for agree, disagree, d in counts:
+      if d >= start and d <= end:
+        total_a += agree
+        total_d += disagree
+    if total_a == 0 and total_d == 0:
+      total_d = 1
+    pct = total_a / float(total_a  + total_d)
+    if pct < low:
+      low = pct
+  return (key, low)
 
-def key_by_interval_and_person_big(((key, (agree, disagree)), (id, start, end))):
-    return ((key[0], start, end), (agree, disagree))
-
-def key_by_2persons((key, (agree, disagree))):
-    newKey = key[0]
-    return (newKey, (key[1], key[2], agree, disagree))
-
-def min_percent((start1, end1, agree1, disagree1), (start2, end2, agree2, disagree2)):
-    if agree1/float(disagree1+agree1) > agree2/float(disagree2+agree2):
-        return (start2, end2, agree2, disagree2)
-    else:
-        return (start1, end1, agree1, disagree1)
+def calculate_percent_grouped(((key, counts), intervals)):
+  conn = create_in_memory_database(counts)
+  c = conn.cursor()
+  curr_low = 1
+  curr_tuple = None
+  for id, start, end in intervals:
+    query = c.execute('''SELECT COALESCE(sum(agree), 0), COALESCE(sum(disagree), 0) FROM votes WHERE date >= ? and date <= ?''', (start, end))
+    agree, disagree = query.fetchone()
+    if agree == 0 and disagree == 0:
+      disagree = 1
+    percent = agree / float(agree + disagree)
+    if percent < curr_low:
+      curr_low = percent
+      curr_tuple = (agree, disagree, percent, start, end)
+  conn.close()
+  return (key, curr_tuple)
 
 def run(context):
     """ Data is in the following format: (bill_id, person_id, vote, type, chamber, year, date, session, status, extra).
@@ -132,25 +147,26 @@ def run(context):
     joined = bills.join(bills, 24)
     joined = joined.filter(filter_join)
     counted = joined.map(count_votes)
-
+    print("=======Mapping votes")
     #small_ints_rdd = context.parallelize(small_intervals)
-    big_ints_rdd = context.parallelize(big_intervals)
-    votes_intervals = counted.cartesian(big_ints_rdd)
-    votes_intervals = votes_intervals.filter(filter_by_int)
-    votes_intervals = votes_intervals.map(key_by_interval_and_person)
-    results = votes_intervals.reduceByKey(reduce_count)
+    big_ints_rdd = context.parallelize(big_intervals, 1)
+    big_ints_rdd = big_ints_rdd.glom()
+    grouped = counted.groupByKey()
+    int_grouped = grouped.cartesian(big_ints_rdd)
+    print("=======FINAL vote mapping.")
+    #cartesian looks like ((key, (agree, disagree)), (id, start, end))
+    results = int_grouped.map(calculate_percent_grouped_2)
 
-    results = results.filter(filter_count).map(key_by_2persons)
-    result_list = results
-    #result_list = results.reduceByKey(min_percent)
-    return result_list
+    return results
 
 if __name__ == "__main__":
     context = SparkContext(master, "Congress Correlation")
     results = run(context).collect()
+    print("====RESULTS: ", len(results))
     with open('output.csv', 'w') as csvfile:
       writer = csv.writer(csvfile)
       for result in results:
         (persons, (start, end, agree, disagree)) = result
         person_split = persons.split(":")
         writer.writerow([person_split[0], person_split[1], str(start), str(end), str(agree), str(disagree), str((agree / (agree + disagree)))])
+    
