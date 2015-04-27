@@ -10,7 +10,7 @@ import pandas
 
 votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]" 
-master = "spark://ec2-54-90-76-104.compute-1.amazonaws.com:7077"
+master = "spark://ec2-54-83-184-241.compute-1.amazonaws.com:7077"
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
     return votes_data
@@ -139,7 +139,7 @@ def run(context):
       result_list = results.collect()
       """ Store the lowest result in a dictionary. """
       for result in result_list:
-        print(result)
+        #print(result)
         (key, (agree, disagree, pct)) = result
         if pct_map[key] > pct or pct_map[key] < .0001:
           pct_map[key] = pct

@@ -10,8 +10,7 @@ import numpy as np
 
 votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]"
-master = "spark://ec2-54-90-76-104.compute-1.amazonaws.com:7077"
-
+master = "spark://ec2-54-83-184-241.compute-1.amazonaws.com:7077"
 
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()

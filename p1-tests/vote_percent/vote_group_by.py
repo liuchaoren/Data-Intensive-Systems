@@ -11,7 +11,7 @@ import sqlite3
 
 votes_file = '2012-curr-full-votes.csv'
 #master = "local[4]"
-master = "spark://ec2-23-22-131-140.compute-1.amazonaws.com:7077"
+master = "spark://ec2-54-83-184-241.compute-1.amazonaws.com:7077"
 def load_votes(context):
     votes_data = context.textFile(votes_file, use_unicode=False).cache()
     return votes_data
@@ -112,7 +112,8 @@ def calculate_percent_grouped_2(((key, counts), intervals)):
     pct = total_a / float(total_a  + total_d)
     if pct < low:
       low = pct
-  return (key, low)
+      low_tuple = (start, end, total_a, total_d)
+  return (key, low_tuple)
 
 def calculate_percent_grouped(((key, counts), intervals)):
   conn = create_in_memory_database(counts)
@@ -144,14 +145,15 @@ def run(context):
     big_intervals = interval.interval_set('1/1/2012', '1/1/2014', freq='15D', max_delta=pandas.Timedelta(days=120))
     #small_intervals = interval.interval_set('1/1/2012', '1/1/2014', freq='15D', max_delta=pandas.Timedelta(days=15))
     bills = raw_votes.map(keyByBillId)
-    joined = bills.join(bills, 24)
+    joined = bills.join(bills, 128)
     joined = joined.filter(filter_join)
     counted = joined.map(count_votes)
     print("=======Mapping votes")
     #small_ints_rdd = context.parallelize(small_intervals)
-    big_ints_rdd = context.parallelize(big_intervals, 1)
-    big_ints_rdd = big_ints_rdd.glom()
-    grouped = counted.groupByKey()
+    big_ints_rdd = context.parallelize([big_intervals], 1)
+    grouped = counted.groupByKey(128)
+    #cnts = grouped.count()
+    #print("number of grouped items: ", cnts)
     int_grouped = grouped.cartesian(big_ints_rdd)
     print("=======FINAL vote mapping.")
     #cartesian looks like ((key, (agree, disagree)), (id, start, end))
