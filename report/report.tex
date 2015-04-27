@@ -1,0 +1,89 @@
+\title{Spark Execution on Fact Checking and Related Workloads}
+\author{
+        Brett Walenz \\
+        Chaoren Liu\\
+}
+\date{}
+\documentclass[11pt]{article}
+\usepackage[parfill]{parskip}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{geometry}
+\usepackage{amsfonts}
+\usepackage[mathscr]{eucal}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{pgfgantt}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subfig}
+
+\lstset{frame=tb, 
+language=Python,
+showstringspaces=false,
+numbers=none,
+breaklines=true
+breakatwhitespace=true,
+tabsize=4,
+aboveskip=3mm,
+belowskip=3mm,
+columns=flexible,
+basicstyle={\small\ttfamily},
+numberstyle=\tiny
+}
+
+\begin{document}
+\maketitle
+\section{Overview}
+The goal of this project was to gain insight into aspects of the Spark execution engine. In particular, we wished to gain insight into the effect different execution plans has on the overall running time, bandwidth required, and computation time across the cluster. Our task is a computation-heavy task and is derived from computational fact-finding. We'd like to answer the following question:
+
+Which two congressional representatives had the lowest voting agreement percentage with a span of at least 120 days, after January 1st 2012?
+
+\section{Approaches}
+The congressional voting record workload finds the vote agreement percentage between all senators with votes occurring after January 1st, 2012 (2770 bills, 900,000 individual votes). 
+
+Our earlier algorithm for finding the vote percentage in Congress looked was sketched as follows: 
+
+\begin{lstlisting}
+   votes = load_votes(context)
+   votes = votes.map(parseVote)
+   joined = votes.join(votes)
+   counted = joined.map(count_votes)
+   counted = counted.reduceByKey(reduce_count)
+\end{lstlisting}
+
+This approach finds the vote correlation between all pairs of congressional representatives, but it doesn’t consider the interval of comparison. 
+
+\subsection{A Note on Intervals}
+We need a way then, to construct interval sets, which consist of a collection of intervals. For instance, a set of intervals might be exhaustive:
+[(1/1/2011, 12/31/2011), (1/2/2011, 12/31/2011), …
+(1/1/2011, 1/30/2011), (1/2/2011, 1/30/2011),...
+(12/01/2011, 12/31/2011), (12/02/2011, 12/31/2011)]
+
+The above set contains all possible intervals from January 1st, 2011 to December 31st, 2011. The interval contains approximately d(d-1)/2 intervals, or 66300 intervals for just one year. We can obviously reduce this set of intervals by noting many intervals contain the same data, or no data at all. And many intervals may be too small for our condition (spanning 100 votes). Thus, each interval in the set must span at least 120 days.
+
+\subsection{Approach 1 - All in One Shot}
+
+A naive expanded approach may then be something such as:
+
+\begin{lstlisting}
+   votes = load_votes(context)
+   votes = votes.map(parseVote)
+   intervals = create_interval_set(start, end, parameters)
+   intervals = intervals.filter([100 votes, no empty data, identical sets])
+   joined = votes.join(votes)
+   joined = joined.cartesian(intervals)
+   joined = joined.filter((votes not in each interval))
+   counted = joined.map(count_votes)
+   counted = counted.reduceByKey(reduce_count)
+\end{lstlisting}
+The additions from the original algorithm are highlighted. It’s important to note that the above algorithm might be exceedingly large due to the cartesian join performed. This can result in an extremely high number of shuffle writes in the reduceByKey stage due to the high number of keys and individual counts generated.
+
+\subsection{Approach 2 - Interval Iterations}
+
+\section{Related Work}
+
+\bibliographystyle{abbrv}
+\bibliography{research}
+
+\end{document}
