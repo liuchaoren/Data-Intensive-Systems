@@ -1,4 +1,4 @@
-# cs516-team
+Data-Intensive-Systems
 Team repository for CS516
 
 Installation
